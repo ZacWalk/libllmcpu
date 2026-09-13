@@ -94,3 +94,4 @@ endif()
 
 enable_testing()
 add_test(NAME nnc-selftest COMMAND nnc --test)
+set_tests_properties(nnc-selftest PROPERTIES LABELS nnc)
