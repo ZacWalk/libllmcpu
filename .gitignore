@@ -1,4 +1,5 @@
 build/
+intermediate/
 exe/
 models/
 .vs/

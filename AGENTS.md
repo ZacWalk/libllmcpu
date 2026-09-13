@@ -230,3 +230,36 @@ runs `--test` on every push and PR to `master`. Keep both green.
 - Do not add docstrings, comments, or refactors to code you are not otherwise changing.
 - When concatenating C/C++ files on Windows, strip any 0x1A (Ctrl+Z) bytes — MSVC treats them as EOF in text mode.
 - Standard-library portability: explicitly include `<cstddef>` for `size_t`, `<cstring>` for `memcpy`/`memset`, `<cmath>` for math — don't rely on transitive includes that happen to work on MSVC.
+
+## dd build system
+
+This repo uses the vendored dd build system. dd has two modes.
+
+**CLI mode** is the default; each verb runs once and exits:
+
+```pwsh
+.\dd.ps1 test                  # build both configs and run the suite
+.\dd.ps1 build debug
+.\dd.ps1 doctor --json
+.\dd.ps1 commands --json       # list this project's own commands
+```
+
+**MCP mode** — `.\dd.ps1 mcp` turns the process into a stdio JSON-RPC server for an
+MCP client, adapting typed requests onto CLI mode. It owns stdout for protocol
+messages, so it prints no result envelope and rejects `--json`. Register it with
+`.\dd.ps1 ide --mcp`.
+
+Project settings live in `dd.psd1`; dependency pins live in
+`cmake/dd-dependencies.json` with `dependencies.owner = 'dd'`. Vendored dd file
+hashes are recorded in `docs/dd-upstream.json`.
+
+### Project commands
+
+`dd download` fetches GGUF weight files into `./models` (ported from the pre-dd
+driver). It declares `effects = 'write'`, so dd requires an explicit opt-in:
+
+```pwsh
+.\dd.ps1 download --dry-run              # list the known models
+.\dd.ps1 download --name all --dry-run   # plan a fetch
+.\dd.ps1 download --name gemma-3-1b-q6k --yes
+```;
