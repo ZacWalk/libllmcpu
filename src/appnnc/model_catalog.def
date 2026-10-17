@@ -1,0 +1,29 @@
+// nnc app — the models nnc offers to download. The one list both the app and
+// `dd download` (cmake/project-command.ps1, which parses this file) use.
+//
+//   NNC_MODEL(name, file, url, bytes, description)
+//
+// `bytes` is the exact file size: it drives the progress bar and is how a
+// finished download is verified. Keep one entry per line, in the order the
+// menu shows them; the first is the recommended default. Drafters (mtp-*)
+// are left out of the menu; nnc suggests them by name for their model.
+
+NNC_MODEL("gemma-3-1b-q6k", "gemma-3-1b-it-Q6_K.gguf", "https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q6_K.gguf", 1011738656, "Gemma 3 1B instruct, 6-bit: small and quick, the best first model")
+NNC_MODEL("gemma-4-e2b-q4km", "gemma-4-E2B-it-Q4_K_M.gguf", "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf", 3106738272, "Gemma 4 E2B instruct, 4-bit: Google's newest small model, smarter, ~2x slower")
+NNC_MODEL("gemma-3-4b-q4km", "gemma-3-4b-it-Q4_K_M.gguf", "https://huggingface.co/unsloth/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf", 2489894016, "Gemma 3 4B instruct, 4-bit: noticeably smarter, about 4x slower")
+NNC_MODEL("gemma-4-e4b-q4km", "gemma-4-E4B-it-Q4_K_M.gguf", "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf", 4977171584, "Gemma 4 E4B instruct, 4-bit: stronger again, about 5x slower")
+NNC_MODEL("gemma-4-26b-a4b-q4km", "gemma-4-26B-A4B-it-Q4_K_M.gguf", "https://huggingface.co/lmstudio-community/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-Q4_K_M.gguf", 16796017248, "Gemma 4 26B A4B (mixture of experts), 4-bit: the strongest; run with --q4 and 16 GB of RAM")
+NNC_MODEL("llama-3.2-1b-q6k", "Llama-3.2-1B-Instruct-Q6_K.gguf", "https://huggingface.co/unsloth/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf", 1021800480, "Llama 3.2 1B instruct, 6-bit: Meta's small model")
+NNC_MODEL("qwen3.5-0.8b-q8", "Qwen3.5-0.8B-Q8_0.gguf", "https://huggingface.co/ggml-org/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q8_0.gguf", 833592096, "Qwen 3.5 0.8B, 8-bit: Alibaba's small hybrid (Gated DeltaNet) model, quick")
+NNC_MODEL("qwen3.5-4b-q4km", "Qwen3.5-4B-Q4_K_M.gguf", "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf", 2740937888, "Qwen 3.5 4B, 4-bit: a much stronger Qwen, about 5x slower")
+NNC_MODEL("qwen3-4b-2507-q4km", "Qwen3-4B-Instruct-2507-Q4_K_M.gguf", "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf", 2497281120, "Qwen3 4B Instruct 2507, 4-bit: a strong all-attention Qwen that answers without thinking")
+NNC_MODEL("qwen3.8-27b-q4km", "Qwen3.8-27B-Q4_K_M.gguf", "https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-Q4_K_M.gguf", 18973870528, "Qwen 3.8 27B, 4-bit: Alibaba's newest open dense model; run with --q4 and 24 GB of RAM")
+NNC_MODEL("gemma-3-270m-q8", "gemma-3-270m-it-Q8_0.gguf", "https://huggingface.co/ggml-org/gemma-3-270m-it-GGUF/resolve/main/gemma-3-270m-it-Q8_0.gguf", 291545600, "Gemma 3 270M instruct, 8-bit: tiny and very fast, for simple tasks")
+NNC_MODEL("functiongemma-270m-q8", "functiongemma-270m-it-q8_0.gguf", "https://huggingface.co/ggml-org/functiongemma-270m-it-GGUF/resolve/main/functiongemma-270m-it-q8_0.gguf", 291557792, "FunctionGemma 270M: turns requests into function calls (examples/function_call.c)")
+NNC_MODEL("translategemma-4b-q4km", "translategemma-4b-it.Q4_K_M.gguf", "https://huggingface.co/mradermacher/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it.Q4_K_M.gguf", 2489909760, "TranslateGemma 4B, 4-bit: translates between 55 languages (--translate en:de)")
+NNC_MODEL("embeddinggemma-300m-q8", "embeddinggemma-300M-Q8_0.gguf", "https://huggingface.co/ggml-org/embeddinggemma-300M-GGUF/resolve/main/embeddinggemma-300M-Q8_0.gguf", 333590944, "EmbeddingGemma 300M: text to vectors, for search and similarity")
+NNC_MODEL("embeddinggemma-2-q8", "embeddinggemma-2-Q8_0.gguf", "https://huggingface.co/ggml-org/embeddinggemma-2-GGUF/resolve/main/embeddinggemma-2-Q8_0.gguf", 309855456, "EmbeddingGemma 2: newer text embeddings, for texts up to 8K tokens")
+NNC_MODEL("gemma-3-1b-bf16", "gemma-3-1b-it-BF16.gguf", "https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-BF16.gguf", 2006573344, "Gemma 3 1B instruct, 16-bit source weights (for --bf16)")
+NNC_MODEL("mtp-gemma-4-e2b-q8", "mtp-gemma-4-E2B-it-Q8_0.gguf", "https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/main/mtp-gemma-4-E2B-it-Q8_0.gguf", 97817696, "MTP drafter for Gemma 4 E2B: faster replies, used automatically")
+NNC_MODEL("mtp-gemma-4-e4b-q8", "mtp-gemma-4-E4B-it-Q8_0.gguf", "https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/mtp-gemma-4-E4B-it-Q8_0.gguf", 98653280, "MTP drafter for Gemma 4 E4B: faster replies, used automatically")
+NNC_MODEL("mtp-gemma-4-26b-a4b-q8", "mtp-gemma-4-26B-A4B-it-Q8_0.gguf", "https://huggingface.co/ggml-org/gemma-4-26B-A4B-it-GGUF/resolve/main/mtp-gemma-4-26B-A4B-it-Q8_0.gguf", 461766784, "MTP drafter for Gemma 4 26B A4B: faster replies, used automatically")

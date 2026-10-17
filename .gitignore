@@ -3,4 +3,5 @@ intermediate/
 exe/
 models/
 .vs/
-.vscode/
+/.vscode/
+/.dd/state/

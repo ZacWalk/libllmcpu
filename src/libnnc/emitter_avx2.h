@@ -1,0 +1,168 @@
+// nnc — AVX2 + FMA encoders.
+// VEX-encoded instructions only. All public ops here use low-8 ymm/xmm
+// registers and low-8 GPR base/index. Extended-register support will be
+// added when a kernel actually needs it.
+
+#pragma once
+
+#include <cstdint>
+
+#include "emitter_x64.h"   // for gpr enum
+
+class jit_buffer;
+
+enum class ymm : uint8_t { y0 = 0, y1, y2, y3, y4, y5, y6, y7, y8, y9, y10, y11, y12, y13, y14, y15 };
+
+// A memory operand [base + index*(1 << scale) + disp]; index gpr::rsp
+// means none.
+struct vmem
+{
+	gpr base;
+	gpr index = gpr::rsp;
+	uint8_t scale = 0;
+	int32_t disp = 0;
+};
+
+class avx2_emitter
+{
+public:
+	explicit avx2_emitter(jit_buffer& buf) : buf_(buf)
+	{
+	}
+
+	// ---- raw VEX builders ----------------------------------------------
+
+	void vex2(uint8_t r, uint8_t vvvv, uint8_t l, uint8_t pp);
+	void vex3(uint8_t r, uint8_t x, uint8_t b,
+	          uint8_t map, uint8_t w, uint8_t vvvv, uint8_t l, uint8_t pp);
+
+	// ---- arithmetic / data movement ------------------------------------
+
+	void vxorps_ymm(ymm dst, ymm a, ymm b);
+
+	// ymm dst <- [base + index*4]
+	void vmovups_ymm_load_basex4(ymm dst, gpr base, gpr index);
+
+	// ymm dst <- [base + index*4 + disp8]   (mod=01 SIB form)
+	void vmovups_ymm_load_basex4_disp8(ymm dst, gpr base, gpr index, int8_t disp);
+
+	// acc <- acc + a * [base + index*4]
+	void vfmadd231ps_ymm_mem_basex4(ymm acc, ymm a, gpr base, gpr index);
+
+	// acc <- acc + a * [base + index*4 + disp8]   (mod=01 SIB form)
+	void vfmadd231ps_ymm_mem_basex4_disp8(ymm acc, ymm a, gpr base, gpr index, int8_t disp);
+
+	// acc <- acc + a * b   (register-register form)
+	void vfmadd231ps_ymm_ymm_ymm(ymm acc, ymm a, ymm b);
+
+	// acc <- acc + a * [base + index*8]        (mod=00 SIB, scale 8)
+	void vfmadd231ps_ymm_mem_basex8(ymm acc, ymm a, gpr base, gpr index);
+
+	// acc <- acc + a * [base + index*8 + disp8]  (mod=01 SIB, scale 8)
+	void vfmadd231ps_ymm_mem_basex8_disp8(ymm acc, ymm a, gpr base, gpr index, int8_t disp);
+
+	// ymm dst <- vpmovzxwd(xmmword [base + index*2])  (8 u16 -> 8 u32, zero-ext)
+	void vpmovzxwd_ymm_load_basex2(ymm dst, gpr base, gpr index);
+
+	// ymm dst <- vpmovzxwd(xmmword [base + index*2 + disp8])  (mod=01 SIB)
+	void vpmovzxwd_ymm_load_basex2_disp8(ymm dst, gpr base, gpr index, int8_t disp);
+
+	// ymm dst <- vpmovzxwd(xmmword [base + index*2 + disp32])  (mod=10 SIB)
+	void vpmovzxwd_ymm_load_basex2_disp32(ymm dst, gpr base, gpr index, int32_t disp);
+
+	// ymm dst <- vpmovsxbd(qword [base + index])  (8 i8 -> 8 i32, sign-ext)
+	void vpmovsxbd_ymm_load_basex1(ymm dst, gpr base, gpr index);
+
+	// ymm dst <- vpmovzxbd(qword [base + index])  (8 u8 -> 8 u32, zero-ext)
+	void vpmovzxbd_ymm_load_basex1(ymm dst, gpr base, gpr index);
+
+	// ymm dst <- vpmovzxbd(qword [base + index + disp8])  (mod=01 SIB)
+	void vpmovzxbd_ymm_load_basex1_disp8(ymm dst, gpr base, gpr index, int8_t disp);
+
+	// ymm dst <- [base + index*8]        (mod=00 SIB, scale 8)
+	void vmovups_ymm_load_basex8(ymm dst, gpr base, gpr index);
+
+	// ymm dst <- [base + index*8 + disp8]  (mod=01 SIB, scale 8)
+	void vmovups_ymm_load_basex8_disp8(ymm dst, gpr base, gpr index, int8_t disp);
+
+	// dst <- a & b
+	void vpand_ymm(ymm dst, ymm a, ymm b);
+
+	// dst <- a == b, per dword (all-ones on equal). vpcmpeqd y,y,y is the
+	// cheapest way to materialise an all-ones vector without a constant pool.
+	void vpcmpeqd_ymm(ymm dst, ymm a, ymm b);
+
+	// dst <- src >> imm, per dword, shifting in zeros
+	void vpsrld_ymm_imm8(ymm dst, ymm src, uint8_t imm);
+
+	// ymm dst <- vpmovsxbd(qword [base + index + disp8])  (mod=01 SIB)
+	void vpmovsxbd_ymm_load_basex1_disp8(ymm dst, gpr base, gpr index, int8_t disp);
+
+	// ymm dst <- vbroadcastss(dword [base])  (one f32 -> 8 lanes)
+	// base must NOT be rsp/rbp/r12/r13 (those need SIB / explicit disp).
+	void vbroadcastss_ymm_load_base(ymm dst, gpr base);
+
+	// ymm dst <- vpbroadcastw(word [base])  (one u16 -> 16 word lanes).
+	// Paired with vpslld 16 this expands a bf16 scalar to 8 f32 lanes
+	// without needing F16C.
+	void vpbroadcastw_ymm_load_base(ymm dst, gpr base);
+
+	// ymm dst <- vcvtdq2ps(ymm src)  (8 i32 -> 8 f32)
+	void vcvtdq2ps_ymm_ymm(ymm dst, ymm src);
+
+	// ymm dst <- vmulps(ymm a, ymm b)  (per-lane multiply)
+	void vmulps_ymm_ymm_ymm(ymm dst, ymm a, ymm b);
+
+	// ymm dst <- vpslld(ymm src, imm8)   (logical shift left, 32-bit lanes)
+	void vpslld_ymm_imm8(ymm dst, ymm src, uint8_t imm);
+
+	// xmm dst <- ymm src lane (0 = low, 1 = high)
+	void vextractf128_xmm_ymm(ymm dst_xmm, ymm src_ymm, uint8_t lane);
+
+	void vaddps_xmm(ymm dst, ymm a, ymm b);
+	void vaddps_ymm(ymm dst, ymm a, ymm b);
+	void vhaddps_xmm(ymm dst, ymm a, ymm b);
+	void vhaddps_ymm(ymm dst, ymm a, ymm b);
+
+	// [base + index*4]  <-  xmm src lane 0  (32-bit store)
+	void vmovss_store_basex4(gpr base, gpr index, ymm src_xmm);
+
+	// [base + index*4]  <-  xmm src (128-bit / 16-byte unaligned store)
+	void vmovups_xmm_store_basex4(gpr base, gpr index, ymm src_xmm);
+
+	// xmm dst <- [base + index*4 + disp8] (128-bit / 16-byte unaligned load)
+	void vmovups_xmm_load_basex4_disp8(ymm dst_xmm, gpr base, gpr index, int8_t disp);
+
+	// [base + index*4 + disp8] <- xmm src (128-bit / 16-byte unaligned store)
+	void vmovups_xmm_store_basex4_disp8(gpr base, gpr index, int8_t disp, ymm src_xmm);
+
+	void vzeroupper();
+
+	// ---- register-general forms ------------------------------------------
+	// Any of ymm0-15 and any GPR in a vmem; always VEX3-encoded, with the
+	// shortest displacement that fits. The low-register encoders above
+	// are kept as they are so existing kernels' bytes do not change.
+
+	void g_vxorps(ymm d, ymm a, ymm b);
+	void g_vaddps(ymm d, ymm a, ymm b);
+	void g_vaddps_xmm(ymm d, ymm a, ymm b);
+	void g_vhaddps_xmm(ymm d, ymm a, ymm b);
+	void g_vmulps(ymm d, ymm a, ymm b);
+	void g_vcvtdq2ps(ymm d, ymm s);
+	void g_vpslld(ymm d, ymm s, uint8_t imm);
+	void g_vpsrld(ymm d, ymm s, uint8_t imm);
+	void g_vextractf128(ymm d_xmm, ymm s, uint8_t lane);
+	void g_vfmadd231ps(ymm acc, ymm a, const vmem& m);
+	void g_vpmovsxbd(ymm d, const vmem& m);
+	void g_vpmovzxbd(ymm d, const vmem& m);
+	void g_vpbroadcastw(ymm d, const vmem& m);
+	void g_vmovss_store(const vmem& m, ymm s);
+	void g_vmovups_xmm_store(const vmem& m, ymm s);
+	void g_vmovups_xmm_load(ymm d, const vmem& m);
+
+private:
+	void g_rr(uint8_t map, uint8_t pp, uint8_t l, uint8_t opc, uint8_t reg, uint8_t vvvv, uint8_t rm);
+	void g_rm(uint8_t map, uint8_t pp, uint8_t l, uint8_t opc, uint8_t reg, uint8_t vvvv, const vmem& m);
+
+	jit_buffer& buf_;
+};

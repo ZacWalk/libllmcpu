@@ -48,3 +48,10 @@ jobs:
 
       - name: Test
         run: ./exe/nnc-d --test
+
+      # The C examples are the only C (not C++) consumers of nnc.h: they keep
+      # the public header valid C.
+      - name: Build the C examples
+        run: |
+          cmake -S . -B build/examples -G Ninja -DCMAKE_BUILD_TYPE=Release -DNNC_BUILD_APP=OFF -DNNC_BUILD_EXAMPLES=ON
+          cmake --build build/examples
