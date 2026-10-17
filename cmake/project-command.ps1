@@ -1,9 +1,8 @@
 #requires -Version 7.4
 # dd project command backing script for nnc.
 #
-# Ported from the pre-dd bespoke driver. Downloads the GGUF weight files nnc can
-# actually load: BF16/F16/F32 straight from the mmap, or Q4_K/Q5_K/Q6_K decoded at
-# load time. Q4_0/Q8_0/IQ* files are rejected by the loader and are not listed.
+# Downloads the same catalogue as the app, defined once in
+# src/appnnc/model_catalog.def.
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 
@@ -15,24 +14,20 @@ if ($request.schema -ne 1 -or $request.projectRoot -ne $root -or $request.parame
 }
 Set-Location $root
 
-$models = [ordered]@{
-    'gemma-3-1b-bf16' = @{
-        File = 'gemma-3-1b-it-BF16.gguf'
-        Url  = 'https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-BF16.gguf'
-        Size = '1.9 GB'
-        Note = 'smallest end-to-end test; exercises the BF16 -> Q8_0 path'
-    }
-    'gemma-3-1b-q6k' = @{
-        File = 'gemma-3-1b-it-Q6_K.gguf'
-        Url  = 'https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q6_K.gguf'
-        Size = '1.0 GB'
-        Note = 'exercises the Q6_K -> Q8_0 load-time decode'
-    }
-    'gemma-3-4b-q4km' = @{
-        File = 'gemma-3-4b-it-Q4_K_M.gguf'
-        Url  = 'https://huggingface.co/unsloth/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf'
-        Size = '2.5 GB'
-        Note = 'exercises the Q4_K -> Q8_0 load-time decode'
+$models = [ordered]@{}
+$catalogFile = Join-Path $root 'src\appnnc\model_catalog.def'
+$catalogLines = Get-Content -LiteralPath $catalogFile | Where-Object { $_ -match '^\s*NNC_MODEL\(' }
+if (-not $catalogLines) { throw "No model entries found in '$catalogFile'." }
+foreach ($line in $catalogLines) {
+    $match = [regex]::Match($line, '^NNC_MODEL\("([^"]+)", "([^"]+)", "([^"]+)", ([0-9]+), "([^"]+)"\)$')
+    if (-not $match.Success) { throw "Cannot parse model catalogue entry: $line" }
+    $bytes = [uint64]::Parse($match.Groups[4].Value, [Globalization.CultureInfo]::InvariantCulture)
+    $models[$match.Groups[1].Value] = @{
+        File = $match.Groups[2].Value
+        Url = $match.Groups[3].Value
+        Bytes = $bytes
+        Size = ('{0:N1} GB' -f ($bytes / 1GB))
+        Note = $match.Groups[5].Value
     }
 }
 
@@ -41,8 +36,10 @@ $requested = if ($request.parameters.name) { [string]$request.parameters.name } 
 $inventory = foreach ($key in $models.Keys) {
     $model = $models[$key]
     $path = Join-Path 'models' $model.File
+    $present = (Test-Path -LiteralPath $path -PathType Leaf) -and
+        (Get-Item -LiteralPath $path).Length -eq $model.Bytes
     @{ name = $key; file = $model.File; size = $model.Size; note = $model.Note
-        present = [bool](Test-Path -LiteralPath $path); path = $path }
+        present = [bool]$present; path = $path }
 }
 
 # No name lists the catalogue rather than fetching gigabytes by accident.
@@ -60,8 +57,10 @@ foreach ($name in $names) {
 $planned = foreach ($name in $names) {
     $model = $models[$name]
     $path = Join-Path 'models' $model.File
+    $present = (Test-Path -LiteralPath $path -PathType Leaf) -and
+        (Get-Item -LiteralPath $path).Length -eq $model.Bytes
     @{ name = $name; file = $model.File; size = $model.Size; url = $model.Url
-        path = $path; present = [bool](Test-Path -LiteralPath $path) }
+        path = $path; present = [bool]$present; expected_bytes = $model.Bytes }
 }
 
 if ($request.dryRun) {
@@ -84,7 +83,20 @@ foreach ($entry in $planned) {
     $ProgressPreference = 'SilentlyContinue'
     try {
         Invoke-WebRequest -Uri $entry.url -OutFile $temporary
-        Move-Item -LiteralPath $temporary -Destination $entry.path
+        if ((Get-Item -LiteralPath $temporary).Length -ne $entry.expected_bytes) {
+            throw "Downloaded '$($entry.file)' has an unexpected size."
+        }
+        $stream = [IO.File]::OpenRead($temporary)
+        try {
+            $magic = [byte[]]::new(4)
+            if ($stream.Read($magic, 0, 4) -ne 4 -or [Text.Encoding]::ASCII.GetString($magic) -ne 'GGUF') {
+                throw "Downloaded '$($entry.file)' is not a GGUF file."
+            }
+        }
+        finally {
+            $stream.Dispose()
+        }
+        Move-Item -LiteralPath $temporary -Destination $entry.path -Force
     }
     finally {
         $ProgressPreference = $previous
